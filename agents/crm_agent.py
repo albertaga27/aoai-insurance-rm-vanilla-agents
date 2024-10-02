@@ -21,15 +21,15 @@ crm_agent = Agent(
     """,  
     llm=llm,  
     description="""Call this Agent if:
-        - You need to retrieve specific client's data
+        - You need to retrieve specific client's data identified by the name of a client in the user request
         DO NOT CALL THIS AGENT IF:  
         - You need to fetch generic policies answers""",  
 )  
 
 
 
-@crm_agent.register_tool(description="Load insured client data from the CRM")
-def load_from_crm() -> str:
+@crm_agent.register_tool(description="Load insured client data from the CRM from the given full name")
+def load_from_crm(full_name:Annotated[str,"The customer full name to search for"]) -> str:
     """
     Load an example file containing insured client data and policies into a pandas DataFrame.
 

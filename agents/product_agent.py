@@ -20,16 +20,13 @@ product_agent = Agent(
         - **Handle all user requests that do NOT include a client's name.**
         - Provide information about policies, prices, coverages, terms and conditions, etc., by using the provided function: 'search_product'.
         - Offer clear and helpful answers to the user's inquiries.
-
-        **Important Guidelines:**
-        - **If the user's request includes a client's name, you should not have been called, tell the manager to call other agents.**
         
     """,  
     llm=llm,  
     description="""Call this Agent if:
         - You need to retrieve generic policies details, terms and conditions or other offering related information
         DO NOT CALL THIS AGENT IF:  
-        - You need to fetch specific client's data""",
+        - You need to search for specific client's data identified by a client name in the request""",
     )  
 
 
@@ -70,10 +67,10 @@ def search(query: str):
     return output
     
     
-@product_agent.register_tool(description="Load insured client data from the CRM")
-def search_product(query: str) -> str:
+@product_agent.register_tool(description="Search product policies, terms, conditions")
+def search_product(query:Annotated[str,"The query to search for"]) -> str:
     """
-    Search general insurance product inforamtions regarding policies, coverages and terms and conditions by permorming a POST request to an Azure AI Search using the specified search body.
+    Search general insurance product information regarding policies, coverages and terms and conditions by permorming a POST request to an Azure AI Search using the specified search body.
 
     Parameters:
     query

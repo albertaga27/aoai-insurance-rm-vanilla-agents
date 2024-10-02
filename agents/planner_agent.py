@@ -9,7 +9,7 @@ planner_agent = Agent(
     
     Your task are:
     - Greet the advisor at first. Be sure to ask how you can help.
-    - Check if the  advisor has any additional questions. If not, close the conversation.
+    - Check if the advisor has any additional questions. If not, close the conversation.
     - Close the conversation after the  advisor's request has been resolved. Thank the  advisor for their time and wish them a good day and write TERMINATE to end the conversation. DO write TERMINATE in the response.
     
     IMPORTANT NOTES:
@@ -23,7 +23,7 @@ planner_agent = Agent(
         - You need to check if advisor has any additional questions.
         - You need to close the conversation after the advisor's request has been resolved.
         DO NOT CALL THIS AGENT IF:  
-        - You need to fetch client's data or answers
+        - You need to search for client's data 
         - You need to provide product or policies answers
        """,  
 )  

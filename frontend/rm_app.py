@@ -46,6 +46,32 @@ def start_new_conversation():
     st.session_state.conversations.append({'name': 'New Conversation', 'messages': []})
     st.session_state.current_conversation_index = len(st.session_state.conversations) - 1
 
+    # Prepare the payload for the API call init message to trigger the planner agent
+    payload = {
+        "user_id": "rm10",       
+        "message": "Hi"
+    }
+    
+    # Make the API call
+    try:
+        response = requests.post('http://localhost:7071/api/http_trigger', json=payload)
+        assistant_response = response.json()
+    
+    except requests.exceptions.RequestException as e:
+        assistant_response = f"Error: {e}"
+    except ValueError:
+        assistant_response = "Error: Unable to parse the response from the server."
+    
+    #handle the chat_id to the session
+    #st.session_state.conversations[st.session_state.current_conversation_index]['name'] = assistant_response['chat_id']
+
+    # Append assistant's response to the conversation
+    # Retrieve the current conversation
+    conversation_dict = st.session_state.conversations[st.session_state.current_conversation_index]
+    messages = conversation_dict.get('messages', [])
+    messages.append({'role': 'assistant', 'content': assistant_response})
+
+
 def select_conversation(index):
     st.session_state.current_conversation_index = index
 

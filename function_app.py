@@ -118,7 +118,14 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     workflow = Workflow(askable=team, conversation=conversation_history)
     workflow.run(user_message)
     
-    db.update_user_info(chat_id, workflow.conversation.to_dict())
+    previous_history = user_data['chat_histories'].get(chat_id)
+    logging.info(f"\nPrevious history = user_data['chat_histories'][chat_id]: {previous_history}\n")
+
+    merged_history = {**previous_history, **workflow.conversation.to_dict()} 
+    user_data['chat_histories'][chat_id] = merged_history
+    
+    logging.info(f"\nAfter merging history = user_data['chat_histories'][chat_id]: {merged_history}\n")
+    db.update_user_info(user_id, user_data)
     
     delta = len(workflow.conversation.messages) - history_count
     
