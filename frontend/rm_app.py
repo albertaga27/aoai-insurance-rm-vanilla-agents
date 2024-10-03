@@ -3,18 +3,6 @@ import requests
 import json
 import logging
 
-# Inject custom CSS to adjust sidebar width and add Matrix background
-#st.markdown("""
-#    <style>
-#
-#    /* Matrix background using an animated GIF */
-#    .st-emotion-cache-13k62yr{
-#        background: url(https://miro.medium.com/v2/resize:fit:1400/1*y93jZzftu0aJQyc0SjEmTg.gif) no-repeat center center fixed;
-#        background-size: cover;
-#    }
-#    </style>
-#    """, unsafe_allow_html=True)
-
 # Function to fetch conversations from the API
 def fetch_conversations():
     # Prepare the payload for the API call
@@ -77,9 +65,9 @@ def select_conversation(index):
 
 # Sidebar for conversations
 with st.sidebar:
-    st.text("Mr. Anderson... \nI was waiting for you!")
+    st.title("Agentic Assistant")
     # Add the logo image at the top left
-    st.image('agents_matrix_logo.png', width=180)  # Adjust the image path and size as needed
+    st.image('insurance_logo.png', width=200)  # Adjust the image path and size as needed
     #st.title("Conversations")
     if st.button("Start New Conversation"):
         start_new_conversation()
@@ -144,15 +132,23 @@ else:
     # Retrieve the current conversation
     conversation_dict = st.session_state.conversations[st.session_state.current_conversation_index]
     messages = conversation_dict.get('messages', [])
-    
+    print(f"\nMessages: {messages}")
     # Display chat messages
     for message in messages:
         if message['role'] == 'user':
             with st.chat_message("user"):
                 st.write(message['content'])
         else:
-            with st.chat_message("assistant"):
-                st.write(message['content'])
+            message_name = message.get('name', '')  # Returns '' if 'name' is not in message
+            if message_name == 'Planner':
+                with st.chat_message("assistant", avatar="avatars/planner_avatar.png"):
+                    st.write(message['content'])
+            elif message_name == 'CRM':
+                with st.chat_message("assistant", avatar="avatars/crm_avatar.png"):
+                    st.write(message['content']) 
+            else:
+                with st.chat_message("assistant", avatar="avatars/search_avatar.png"):
+                    st.write(message['content'])       
     
     # Input field for the user to send a message
     user_input = st.chat_input("Your message")
