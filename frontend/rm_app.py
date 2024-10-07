@@ -2,6 +2,11 @@ import streamlit as st
 import requests  
 import json
 import logging
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Function to fetch conversations from the API
 def fetch_conversations():
@@ -11,8 +16,9 @@ def fetch_conversations():
         "load_history": True
     }
     
+    backend_url = os.getenv('FUNCTION_APP_URL')
     try:
-        response = requests.post('http://localhost:7071/api/http_trigger', json=payload)
+        response = requests.post(f'http://{backend_url}/api/http_trigger', json=payload)
         assistant_response = response.json()
 
     except requests.exceptions.RequestException as e:
@@ -42,6 +48,12 @@ def extract_assistant_messages(data):
     else:
         return 'Could not find any message...'
     
+
+st.set_page_config(
+    page_title="Moneta - Agentic Assistant for Insurance",
+    initial_sidebar_state="expanded",
+  
+)
 
 # Initialize session_state variables
 if 'conversations' not in st.session_state:
@@ -195,7 +207,7 @@ else:
             
             # Make the API call
             try:
-                response = requests.post('http://localhost:7071/api/http_trigger', json=payload)
+                response = requests.post(f'http://{backend_url}/api/http_trigger', json=payload)
                 assistant_response = response.json()
             
             except requests.exceptions.RequestException as e:

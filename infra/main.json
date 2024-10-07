@@ -1,0 +1,437 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.30.23.60470",
+      "templateHash": "13476894625778935658"
+    }
+  },
+  "parameters": {
+    "functionAppDockerImage": {
+      "type": "string",
+      "defaultValue": "DOCKER|moneta.azurecr.io/moneta-aiagentic-insurance:v1.0.0"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Name of the Resource Group"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "namePrefix": {
+      "type": "string",
+      "defaultValue": "moneta",
+      "metadata": {
+        "description": "Name prefix for all resources"
+      }
+    },
+    "cosmosDbAccountName": {
+      "type": "string",
+      "defaultValue": "[toLower(format('cdb{0}{1}', uniqueString(resourceGroup().id), parameters('namePrefix')))]",
+      "metadata": {
+        "description": "Name of the Cosmos DB account"
+      }
+    },
+    "cosmosDbDatabaseName": {
+      "type": "string",
+      "defaultValue": "ConversationDB",
+      "metadata": {
+        "description": "Name of the Cosmos DB database"
+      }
+    },
+    "cosmosDbContainerName": {
+      "type": "string",
+      "defaultValue": "Conversations",
+      "metadata": {
+        "description": "Name of the Cosmos DB container"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "[toLower(format('sto{0}{1}', uniqueString(resourceGroup().id), parameters('namePrefix')))]",
+      "metadata": {
+        "description": "Name of the Storage Account"
+      }
+    },
+    "functionAppName": {
+      "type": "string",
+      "defaultValue": "[toLower(format('func{0}{1}', uniqueString(resourceGroup().id), parameters('namePrefix')))]",
+      "metadata": {
+        "description": "Name of the Function App"
+      }
+    },
+    "appInsightsLocation": {
+      "type": "string",
+      "defaultValue": "[parameters('location')]",
+      "metadata": {
+        "description": "Application Insights Location"
+      }
+    },
+    "AZURE_OPENAI_ENDPOINT": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Azure OpenAI Endpoint"
+      }
+    },
+    "AZURE_OPENAI_KEY": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Azure OpenAI Key"
+      }
+    },
+    "AZURE_OPENAI_MODEL": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure OpenAI Model"
+      }
+    },
+    "AZURE_OPENAI_API_VERSION": {
+      "type": "string",
+      "defaultValue": "2024-05-01-preview",
+      "metadata": {
+        "description": "Azure OpenAI API Version"
+      }
+    },
+    "AI_SEARCH_ENDPOINT": {
+      "type": "securestring",
+      "metadata": {
+        "description": "AI Search Endpoint"
+      }
+    },
+    "AI_SEARCH_KEY": {
+      "type": "securestring",
+      "metadata": {
+        "description": "AI Search Key"
+      }
+    },
+    "AI_SEARCH_INDEX_NAME": {
+      "type": "string",
+      "metadata": {
+        "description": "AI Search Index Name"
+      }
+    },
+    "AI_SEARCH_SEMANTIC_CONFIGURATION": {
+      "type": "string",
+      "metadata": {
+        "description": "AI Search Semantic Configuration"
+      }
+    },
+    "appServicePlanName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-streamlit-plan', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the App Service Plan for Streamlit"
+      }
+    },
+    "webAppName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-streamlit-app', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the Web App for Streamlit"
+      }
+    }
+  },
+  "variables": {
+    "commonTags": {
+      "solution": "moneta-ins-gbb-ai-1.0"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot"
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[format('{0}-ai', parameters('functionAppName'))]",
+      "location": "[parameters('appInsightsLocation')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web"
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2022-08-15",
+      "name": "[parameters('cosmosDbAccountName')]",
+      "location": "[parameters('location')]",
+      "kind": "GlobalDocumentDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ],
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        },
+        "capabilities": [],
+        "ipRules": [],
+        "isVirtualNetworkFilterEnabled": false,
+        "enableAutomaticFailover": false,
+        "enableFreeTier": false,
+        "enableAnalyticalStorage": false,
+        "cors": []
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+      "apiVersion": "2022-05-15",
+      "name": "[format('{0}/{1}', parameters('cosmosDbAccountName'), parameters('cosmosDbDatabaseName'))]",
+      "properties": {
+        "resource": {
+          "id": "[parameters('cosmosDbDatabaseName')]"
+        },
+        "options": {}
+      },
+      "tags": "[variables('commonTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2022-05-15",
+      "name": "[format('{0}/{1}/{2}', parameters('cosmosDbAccountName'), parameters('cosmosDbDatabaseName'), parameters('cosmosDbContainerName'))]",
+      "properties": {
+        "resource": {
+          "id": "[parameters('cosmosDbContainerName')]",
+          "partitionKey": {
+            "paths": [
+              "/userId"
+            ],
+            "kind": "Hash"
+          },
+          "indexingPolicy": {
+            "indexingMode": "consistent",
+            "automatic": true,
+            "includedPaths": [
+              {
+                "path": "/*"
+              }
+            ],
+            "excludedPaths": []
+          }
+        },
+        "options": {}
+      },
+      "tags": "[variables('commonTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('cosmosDbAccountName'), parameters('cosmosDbDatabaseName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-03-01",
+      "name": "[format('{0}-plan', parameters('functionAppName'))]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Y1",
+        "tier": "Dynamic"
+      },
+      "kind": "functionapp",
+      "properties": {
+        "reserved": false
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('functionAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('functionAppName')))]",
+        "siteConfig": {
+          "pythonVersion": "3.10",
+          "linuxFxVersion": "[parameters('functionAppDockerImage')]",
+          "alwaysOn": true,
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage__credential",
+              "value": "managedidentity"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "python"
+            },
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "1"
+            },
+            {
+              "name": "AzureWebJobsStorage__serviceUri",
+              "value": "[format('https://{0}.blob.core.windows.net', parameters('storageAccountName'))]"
+            },
+            {
+              "name": "AzureWebJobsStorage__blobServiceUri",
+              "value": "[format('https://{0}.blob.core.windows.net', parameters('storageAccountName'))]"
+            },
+            {
+              "name": "AzureWebJobsStorage__queueServiceUri",
+              "value": "[format('https://{0}.queue.core.windows.net', parameters('storageAccountName'))]"
+            },
+            {
+              "name": "AzureWebJobsStorage__tableServiceUri",
+              "value": "[format('https://{0}.table.core.windows.net', parameters('storageAccountName'))]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "https://index.docker.io"
+            },
+            {
+              "name": "COSMOSDB_ENDPOINT",
+              "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName')), '2022-08-15').documentEndpoint]"
+            },
+            {
+              "name": "COSMOSDB_DATABASE_NAME",
+              "value": "[parameters('cosmosDbDatabaseName')]"
+            },
+            {
+              "name": "COSMOSDB_CONTAINER_USER_NAME",
+              "value": "[parameters('cosmosDbContainerName')]"
+            },
+            {
+              "name": "AZURE_OPENAI_ENDPOINT",
+              "value": "[parameters('AZURE_OPENAI_ENDPOINT')]"
+            },
+            {
+              "name": "AZURE_OPENAI_KEY",
+              "value": "[parameters('AZURE_OPENAI_KEY')]"
+            },
+            {
+              "name": "AZURE_OPENAI_MODEL",
+              "value": "[parameters('AZURE_OPENAI_MODEL')]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_VERSION",
+              "value": "[parameters('AZURE_OPENAI_API_VERSION')]"
+            },
+            {
+              "name": "AI_SEARCH_ENDPOINT",
+              "value": "[parameters('AI_SEARCH_ENDPOINT')]"
+            },
+            {
+              "name": "AI_SEARCH_KEY",
+              "value": "[parameters('AI_SEARCH_KEY')]"
+            },
+            {
+              "name": "AI_SEARCH_INDEX_NAME",
+              "value": "[parameters('AI_SEARCH_INDEX_NAME')]"
+            },
+            {
+              "name": "AI_SEARCH_SEMANTIC_CONFIGURATION",
+              "value": "[parameters('AI_SEARCH_SEMANTIC_CONFIGURATION')]"
+            }
+          ]
+        }
+      },
+      "tags": "[variables('commonTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('functionAppName')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2020-04-01-preview",
+      "scope": "[format('Microsoft.DocumentDB/databaseAccounts/{0}', parameters('cosmosDbAccountName'))]",
+      "name": "[guid(subscription().id, resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName')), resourceId('Microsoft.Web/sites', parameters('functionAppName')), extensionResourceId(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName')), 'Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '2022-03-01', 'full').identity.principalId]",
+        "roleDefinitionId": "[extensionResourceId(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName')), 'Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDbAccountName'))]",
+        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "B1",
+        "tier": "Basic"
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('webAppName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "siteConfig": {
+          "linuxFxVersion": "PYTHON|3.10",
+          "appSettings": [
+            {
+              "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+              "value": "false"
+            },
+            {
+              "name": "FUNCTION_APP_URL",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '2022-03-01').defaultHostName]"
+            }
+          ]
+        },
+        "httpsOnly": true
+      },
+      "kind": "app,linux",
+      "tags": "[variables('commonTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites/sourcecontrols",
+      "apiVersion": "2022-03-01",
+      "name": "[format('{0}/{1}', parameters('webAppName'), 'web')]",
+      "properties": {
+        "repoUrl": "https://github.com/albertaga27/aoai-insurance-rm-vanilla-agents",
+        "branch": "main",
+        "isManualIntegration": true
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+      ]
+    }
+  ]
+}

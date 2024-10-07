@@ -3,6 +3,7 @@
   "clientID": "123456",  
   "firstName": "John",  
   "lastName": "Doe",  
+  "fullName": "John Doe",  
   "dateOfBirth": "1980-01-01",  
   "nationality": "Malaysia",  
   "contactDetails": {  
