@@ -8,19 +8,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+backend_url = os.getenv('FUNCTION_APP_URL')
+
 # Function to fetch conversations from the API
 def fetch_conversations():
     # Prepare the payload for the API call
     payload = {
-        "user_id": "rm10",  # You can replace this with dynamic user ID if available
+        "user_id": "rm10", 
         "load_history": True
     }
     
-    backend_url = os.getenv('FUNCTION_APP_URL')
     try:
-        response = requests.post(f'http://{backend_url}/api/http_trigger', json=payload)
+        response = requests.post(f'https://{backend_url}/api/http_trigger', json=payload)
+        logging.info(f"Response fetch() = {response}")
         assistant_response = response.json()
-
+        
     except requests.exceptions.RequestException as e:
         assistant_response = f"Error: {e}"
     except ValueError:
@@ -106,7 +108,7 @@ with st.sidebar:
     st.write("---")
     # List past conversations
     for idx, conv_dict in enumerate(st.session_state.conversations):
-        print(f"Past conversations: {conv_dict}")
+        #print(f"Past conversations: {conv_dict}")
         conv_name = conv_dict.get('name', f"Conversation {idx+1}")
         messages = conv_dict.get('messages', [])
         if messages:
@@ -164,7 +166,7 @@ else:
     # Retrieve the current conversation
     conversation_dict = st.session_state.conversations[st.session_state.current_conversation_index]
     messages = conversation_dict.get('messages', [])
-    print(f"\nMessages: {messages}")
+    #print(f"\nMessages: {messages}")
     # Display chat messages
     for message in messages:
         if message['role'] == 'user':
@@ -207,11 +209,12 @@ else:
             
             # Make the API call
             try:
-                response = requests.post(f'http://{backend_url}/api/http_trigger', json=payload)
+                response = requests.post(f'https://{backend_url}/api/http_trigger', json=payload)
                 assistant_response = response.json()
-            
+                #logging.info(f"api response: {assistant_response}")
             except requests.exceptions.RequestException as e:
                 assistant_response = f"Error: {e}"
+                logging.error(f"Error: {e}")
             except ValueError:
                 assistant_response = "Error: Unable to parse the response from the server."
             

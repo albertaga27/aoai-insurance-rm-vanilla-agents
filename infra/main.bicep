@@ -1,7 +1,7 @@
 // main.bicep
 
 param functionAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-backend:v1.0.23'
-param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.0'
+param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.1'
 
 @description('Name of the Resource Group')
 param resourceGroupName string = resourceGroup().name
@@ -353,6 +353,21 @@ resource cosmosDbRoleAssignment 'Microsoft.Authorization/roleAssignments@2020-04
   ]
 }
 
+// Cosmos DB role assignment
+resource cosmosDBDataContributorRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2021-04-15' existing = {
+  parent: cosmosDbAccount
+  name: '00000000-0000-0000-0000-000000000002' // Built-in Data Contributor Role
+}
+
+resource cosmosDBRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2021-04-15' = {
+  parent: cosmosDbAccount
+  name: guid(cosmosDbAccount.id, functionApp.id, cosmosDBDataContributorRoleDefinition.id)
+  properties: {
+    roleDefinitionId: cosmosDBDataContributorRoleDefinition.id
+    principalId: functionApp.identity.principalId
+    scope: cosmosDbAccount.id
+  }
+}
 
 
 @description('Name of the App Service Plan for Streamlit')
