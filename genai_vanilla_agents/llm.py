@@ -5,6 +5,11 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 import json
 import logging
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 class LLM(ABC):

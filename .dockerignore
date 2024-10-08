@@ -6,3 +6,5 @@ logs/
 frontend/
 .env
 notebooks/
+banking/
+local.settings.json

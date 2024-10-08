@@ -1,6 +1,6 @@
 // main.bicep
 
-param functionAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-backend:v1.0.0'
+param functionAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-backend:v1.0.23'
 param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.0'
 
 @description('Name of the Resource Group')
@@ -21,6 +21,9 @@ param cosmosDbDatabaseName string = 'ConversationDB'
 @description('Name of the Cosmos DB container')
 param cosmosDbContainerName string = 'Conversations'
 
+// Define the storage account name
+param storageAccountName string = 'sa${uniqueString(resourceGroup().id)}'
+
 @description('Name of the Function App')
 param functionAppName string = toLower('func${uniqueString(resourceGroup().id)}')
 
@@ -29,7 +32,6 @@ param appInsightsLocation string = location
 
 // New parameters for Azure OpenAI
 @description('Azure OpenAI Endpoint')
-@secure()
 param AZURE_OPENAI_ENDPOINT string
 
 @description('Azure OpenAI Key')
@@ -40,11 +42,10 @@ param AZURE_OPENAI_KEY string
 param AZURE_OPENAI_MODEL string
 
 @description('Azure OpenAI API Version')
-param AZURE_OPENAI_API_VERSION string = '2024-05-01-preview'
+param AZURE_OPENAI_API_VERSION string
 
 // New parameters for AI Search
 @description('AI Search Endpoint')
-@secure()
 param AI_SEARCH_ENDPOINT string
 
 @description('AI Search Key')
@@ -157,31 +158,84 @@ resource servicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   tags: commonTags
 }
 
+// Define the storage account
+resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+  }
+  tags: commonTags
+}
+
+// Define the blob service
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2022-05-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
 // Create the Function App with Managed Identity
 resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
   name: functionAppName
   location: location
-  kind: 'functionapp'
   identity: {
     type: 'SystemAssigned'
   }
+  kind: 'functionapp'
   properties: {
     serverFarmId: servicePlan.id
+    httpsOnly: true
     siteConfig: {
-      pythonVersion: '3.10'
+      pythonVersion: '3.11'
       linuxFxVersion: functionAppDockerImage
       alwaysOn: true
       appSettings: [ 
         {
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'  
+        } 
+        {
           name: 'FUNCTIONS_EXTENSION_VERSION'
           value: '~4'
+        }
+        {
+          name: 'AzureWebJobsFeatureFlags'
+          value: 'EnableWorkerIndexing'
+        }
+        {
+          name: 'AzureWebJobsStorage__serviceUri'
+          value: 'https://${storageAccount.name}.blob.core.windows.net'  
+        }  
+        {
+          name: 'AzureWebJobsStorage__blobServiceUri'
+          value: 'https://${storageAccount.name}.blob.core.windows.net'  
+        }
+        {
+          name: 'AzureWebJobsStorage__queueServiceUri'
+          value: 'https://${storageAccount.name}.queue.core.windows.net'  
+        }
+        {
+          name: 'AzureWebJobsStorage__tableServiceUri'
+          value: 'https://${storageAccount.name}.table.core.windows.net'  
+        }              
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
           value: 'python'
         }
         {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          name: 'FUNCTIONS_WORKER_PROCESS_COUNT'
+          value: '1'
+        }
+        {
+          name: 'WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT'
           value: '1'
         }
         {
@@ -235,11 +289,49 @@ resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
       ]
     }
   }
-  dependsOn: [
-    servicePlan
-    cosmosDbAccount
-  ]
+  
   tags: commonTags
+}
+
+// Role assignments for the Function App's managed identity
+resource functionAppStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(functionApp.id, storageAccount.id, 'StorageBlobDataContributor')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource functionAppStorageBlobDataOwnerRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(functionApp.id, storageAccount.id, 'StorageBlobDataOwner')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b') // Storage Blob Data Owner
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource functionAppStorageQueueDataContributorRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(functionApp.id, storageAccount.id, 'StorageQueueDataContributor')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '974c5e8b-45b9-4653-ba55-5f855dd0fb88') // Storage Queue Data Contributor
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource functionAppStorageAccountContributorRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(functionApp.id, storageAccount.id, 'StorageAccountContributor')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '17d1049b-9a84-46fb-8f53-869881c3d3ab') // Storage Account Contributor
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
 }
 
 // Grant Cosmos DB access to the Function App's Managed Identity

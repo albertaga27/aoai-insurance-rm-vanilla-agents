@@ -9,20 +9,20 @@ import requests
 
 from pydantic import BaseModel, Field
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from conversation_store import ConversationStore
 from genai_vanilla_agents.workflow import Workflow
 from genai_vanilla_agents.conversation import Conversation
 from agents.group_chat import create_group_chat
 
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
-app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 @app.route(route="http_trigger")
-def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
+def main(req: func.HttpRequest) -> func.HttpResponse:
     """
     Example usage
     {"user_id":"rm3","message":"What policy is best to travel to Canada?"}
@@ -137,3 +137,4 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="application/json"
     )
+    
