@@ -3,15 +3,23 @@ import requests
 import json
 import logging
 import os
+from streamlit_msal import Msal
+import msal
 
 from dotenv import load_dotenv
-
 load_dotenv()
+
+st.set_page_config(
+    page_title="Moneta - Agentic Assistant for Insurance",
+    initial_sidebar_state="expanded",
+  
+)
 
 backend_url = os.getenv('FUNCTION_APP_URL')
 
 # Function to fetch conversations from the API
 def fetch_conversations():
+    
     # Prepare the payload for the API call
     payload = {
         "user_id": "rm10", 
@@ -51,11 +59,6 @@ def extract_assistant_messages(data):
         return 'Could not find any message...'
     
 
-st.set_page_config(
-    page_title="Moneta - Agentic Assistant for Insurance",
-    initial_sidebar_state="expanded",
-  
-)
 
 # Initialize session_state variables
 if 'conversations' not in st.session_state:
@@ -68,37 +71,35 @@ def start_new_conversation():
     st.session_state.conversations.append({'name': 'New Conversation', 'messages': []})
     st.session_state.current_conversation_index = len(st.session_state.conversations) - 1
 
-    # # Prepare the payload for the API call init message to trigger the planner agent
-    # payload = {
-    #     "user_id": "rm10",       
-    #     "message": "Hi"
-    # }
-
-    # # Make the API call
-    # try:
-    #     response = requests.post('http://localhost:7071/api/http_trigger', json=payload)
-    #     assistant_response = response.json()
-    
-    # except requests.exceptions.RequestException as e:
-    #     assistant_response = f"Error: {e}"
-    # except ValueError:
-    #     assistant_response = "Error: Unable to parse the response from the server."
-    
-    # #handle the chat_id to the session
-    # #st.session_state.conversations[st.session_state.current_conversation_index]['name'] = assistant_response['chat_id']
-
-    # # Append assistant's response to the conversation
-    # # Retrieve the current conversation
-    # conversation_dict = st.session_state.conversations[st.session_state.current_conversation_index]
-    # messages = conversation_dict.get('messages', [])
-    # messages.append({'role': 'assistant', 'content': assistant_response})
-
-
 def select_conversation(index):
     st.session_state.current_conversation_index = index
 
 # Sidebar for conversations
 with st.sidebar:
+
+    # auth_data = Msal.initialize_ui(
+    #     client_id=os.getenv("AZ_REG_APP_CLIENT_ID"),
+    #     authority=f"https://login.microsoftonline.com/{tenant_id}",
+    #     scopes=scopes,
+    #     # Customize (Default values):
+    #     connecting_label="Connecting",
+    #     disconnected_label="Disconnected",
+    #     sign_in_label="Sign in",
+    #     sign_out_label="Sign out",
+    #     redirectUri=redirectUri
+    # )
+
+    # if not auth_data:
+    #     st.write("Authenticate to access protected content")
+    #     st.stop()
+
+    # account = auth_data["account"]
+    # name = account["name"]
+
+    # st.write(f"Hello {name}!")
+    
+    #TODO: handle auth and display the rest only if authenticated
+
     st.title("Agentic Assistant")
     # Add the logo image at the top left
     st.image('insurance_logo.png', width=200)  # Adjust the image path and size as needed
@@ -155,6 +156,60 @@ with st.sidebar:
                     st.session_state.current_conversation_index -= 1
                 del st.session_state['show_options']
                 st.experimental_rerun()
+
+
+# Azure AD configurations
+CLIENT_ID = os.getenv("AZ_REG_APP_CLIENT_ID")
+TENANT_ID = os.getenv("AZ_TENANT_ID")
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
+SCOPE = ["User.Read"]
+REDIRECT_URI = os.getenv("WEB_REDIRECT_URI")
+REDIRECT_PATH = "/.auth/login/aad/callback"
+
+# Initialize MSAL client
+msal_instance = msal.ConfidentialClientApplication(
+    CLIENT_ID,
+    authority=AUTHORITY,
+    client_credential=None
+)
+
+def get_auth_url():
+    return msal_instance.get_authorization_request_url(
+        SCOPE,
+        redirect_uri=REDIRECT_URI+ REDIRECT_PATH
+    )
+
+def get_token_from_code(code):
+    result = msal_instance.acquire_token_by_authorization_code(
+        code,
+        scopes=SCOPE,
+        redirect_uri=REDIRECT_URI + REDIRECT_PATH
+    )
+    return result
+
+
+st.title("Streamlit Azure AD Authentication")
+
+if "access_token" not in st.session_state:
+    # Check if we're in the redirect flow
+    if "code" in st.experimental_get_query_params():
+        code = st.experimental_get_query_params()["code"][0]
+        token_result = get_token_from_code(code)
+        if "access_token" in token_result:
+            st.session_state.access_token = token_result["access_token"]
+        else:
+            st.error("Failed to acquire token")
+    else:
+        # If not authenticated, show login button
+        auth_url = get_auth_url()
+        st.markdown(f'<a href="{auth_url}" target="_self">Login with Azure AD</a>', unsafe_allow_html=True)
+else:
+    # User is authenticated, fetch and display user info
+    headers = {'Authorization': f'Bearer {st.session_state.access_token}'}
+    user_info = requests.get('https://graph.microsoft.com/v1.0/me', headers=headers).json()
+    st.write(f"Welcome, {user_info.get('displayName', 'User')}!")
+    st.write("Your user information:")
+    st.json(user_info)
 
 # Main chat area
 if st.session_state.current_conversation_index is None:
