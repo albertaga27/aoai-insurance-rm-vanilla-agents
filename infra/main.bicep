@@ -1,7 +1,7 @@
 // main.bicep
 
 param functionAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-backend:v1.0.23'
-param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.3'
+param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.8'
 
 @description('Name of the Resource Group')
 param resourceGroupName string = resourceGroup().name
