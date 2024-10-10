@@ -31,6 +31,12 @@ PREDEFINED_QUESTIONS = [
     "Please let me know the full claim procedure for accidents abroad"
 ]
 
+AGENTS = {
+    'Planner': {'emoji': '📅', 'color': '#28a745'},
+    'CRM': {'emoji': '👥', 'color': '#17a2b8'},
+    'Product': {'emoji': '🔍', 'color': '#ffc107'}
+}
+
 # Updated Custom CSS
 st.markdown("""
     <style>
@@ -207,10 +213,35 @@ def select_conversation(index):
 
 def display_sidebar():
     with st.sidebar:
-        
-        # st.image('insurance_logo.png', width=250)
         st.title("Moneta Assistant")
+        st.write("Empowering Advisors with AI")
+        
+        ## Show online agents       
+        st.markdown("<h4 style='text-align: left;'>Agents Online:</h4>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+
+        for i, (agent, details) in enumerate(AGENTS.items()):
+            with [col1, col2, col3][i]:
+                st.markdown(
+                    f"""
+                    <div class="agent-indicator">
+                        <div class="agent-circle" style="background-color: {details['color']};">
+                            {details['emoji']}
+                        </div>
+                        <div class="agent-name">
+                            {agent}<span class="checkmark">✓</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        st.write("---")
         st.write(f"Welcome, {st.session_state.display_name}!")
+        
+        
+        
         if st.button("Start New Conversation", key="new_conv_button"):
             start_new_conversation()
         st.write("---")
@@ -239,13 +270,49 @@ def display_sidebar():
         if st.button("Logout"):
             logout()
 
+def display_online_agents():
+    st.markdown(
+        """
+        <style>
+        .agent-indicator {
+            display: inline-block;
+            margin: 0 10px;
+            text-align: center;
+        }
+        .agent-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            margin-bottom: 5px;
+        }
+        .agent-name {
+            font-size: 14px;
+        }
+        .checkmark {
+            font-size: 20px;
+            color: #4CAF50;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 
 def display_chat():
-    st.markdown("<h1 style='text-align: center;'>Empowering Advisors with AI</h1>", unsafe_allow_html=True)
+    display_online_agents()
     
     if st.session_state.current_conversation_index is None:
         st.write("Please start a new conversation or select an existing one from the sidebar.")
         return
+
     # Dropdown for pre-defined questions
     question_options = ["Select a predefined question or type your own below"] + PREDEFINED_QUESTIONS
     selected_question = st.selectbox("", question_options, key="question_selectbox")
@@ -254,16 +321,31 @@ def display_chat():
     messages = conversation_dict.get('messages', [])
 
     for message in messages:
-        with st.chat_message(message['role'], avatar=get_avatar(message)):
-            st.write(message['content'])
-
+        if message['role'] == 'user':
+            with st.chat_message(message['role']):
+                st.write(message['content'])
+        else:
+            if 'name' in message:
+                agent_name = message.get('name', '')
+                agent_info = AGENTS.get(agent_name)
+                with st.chat_message(message['role'], avatar=agent_info['emoji']):
+                    st.markdown(
+                        f"""
+                        <div style='border-left: 5px solid {agent_info['color']}; padding-left: 10px;'>
+                            <strong>{agent_name} Agent:</strong> 
+                            <div>{message['content']}</div>
+                        </div>
+                        
+                        """,
+                        unsafe_allow_html=True
+                    )
 
     
     if selected_question != "Select a predefined question or type your own below":
         if 'last_selected_question' not in st.session_state or st.session_state.last_selected_question != selected_question:
             st.session_state.last_selected_question = selected_question
             messages.append({'role': 'user', 'content': selected_question})
-            with st.spinner('Moneta is thinking...'):
+            with st.spinner('Moneta agents are collaborating to find the best answer...'):
                 assistant_response = send_message_to_backend(selected_question, conversation_dict)
                 messages.append({'role': 'assistant', 'content': extract_assistant_messages(assistant_response)})
             st.rerun()
@@ -272,19 +354,12 @@ def display_chat():
     user_input = st.chat_input("Ask Moneta anything...")
     if user_input:
         messages.append({'role': 'user', 'content': user_input})
-        with st.spinner('Moneta is thinking...'):
+        with st.spinner('Moneta agents are collaborating to find the best answer...'):
             assistant_response = send_message_to_backend(user_input, conversation_dict)
             messages.append({'role': 'assistant', 'content': extract_assistant_messages(assistant_response)})
         st.rerun()
 
-def get_avatar(message):
-    if message['role'] == 'user':
-        return None
-    avatars = {
-        'Planner': "avatars/planner_avatar.png",
-        'CRM': "avatars/crm_avatar.png"
-    }
-    return avatars.get(message.get('name'), "avatars/search_avatar.png")
+
 
 def send_message_to_backend(user_input, conversation_dict):
     payload = {
@@ -298,10 +373,17 @@ def send_message_to_backend(user_input, conversation_dict):
         response = requests.post(f'https://{BACKEND_URL}/api/http_trigger', json=payload)
         assistant_response = response.json()
         st.session_state.conversations[st.session_state.current_conversation_index]['name'] = assistant_response['chat_id']
+        
+        # Modify this part to include the agent name in the response
+        reply = assistant_response.get('reply', [])
+        for message in reply:
+            if message['role'] == 'assistant':
+                message['name'] = message.get('name', 'Assistant')
+        
         return assistant_response
     except requests.exceptions.RequestException as e:
         st.error(f"Error: {e}")
-        return {"reply": [{"role": "assistant", "content": "Sorry, an error occurred while processing your request."}]}
+        return {"reply": [{"role": "assistant", "name": "System", "content": "Sorry, an error occurred while processing your request."}]}
 
 def main():
     if not st.session_state.authenticated:
