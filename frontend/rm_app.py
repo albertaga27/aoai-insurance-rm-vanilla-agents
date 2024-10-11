@@ -320,6 +320,15 @@ def display_chat():
     conversation_dict = st.session_state.conversations[st.session_state.current_conversation_index]
     messages = conversation_dict.get('messages', [])
 
+
+    if selected_question != "Select a predefined question or type your own below":
+        if 'last_selected_question' not in st.session_state or st.session_state.last_selected_question != selected_question:
+            st.session_state.last_selected_question = selected_question
+            messages.append({'role': 'user', 'content': selected_question})
+            with st.spinner('Moneta agents are collaborating to find the best answer...'):
+                assistant_response = send_message_to_backend(selected_question, conversation_dict)
+                messages.append(assistant_response)
+            st.rerun()
     for message in messages:
         if message['role'] == 'user':
             with st.chat_message(message['role']):
@@ -340,23 +349,13 @@ def display_chat():
                         unsafe_allow_html=True
                     )
 
-    
-    if selected_question != "Select a predefined question or type your own below":
-        if 'last_selected_question' not in st.session_state or st.session_state.last_selected_question != selected_question:
-            st.session_state.last_selected_question = selected_question
-            messages.append({'role': 'user', 'content': selected_question})
-            with st.spinner('Moneta agents are collaborating to find the best answer...'):
-                assistant_response = send_message_to_backend(selected_question, conversation_dict)
-                messages.append({'role': 'assistant', 'content': extract_assistant_messages(assistant_response)})
-            st.rerun()
-
     # Custom input field
     user_input = st.chat_input("Ask Moneta anything...")
     if user_input:
         messages.append({'role': 'user', 'content': user_input})
         with st.spinner('Moneta agents are collaborating to find the best answer...'):
             assistant_response = send_message_to_backend(user_input, conversation_dict)
-            messages.append({'role': 'assistant', 'content': extract_assistant_messages(assistant_response)})
+            messages.append(assistant_response)
         st.rerun()
 
 
@@ -373,17 +372,15 @@ def send_message_to_backend(user_input, conversation_dict):
         response = requests.post(f'https://{BACKEND_URL}/api/http_trigger', json=payload)
         assistant_response = response.json()
         st.session_state.conversations[st.session_state.current_conversation_index]['name'] = assistant_response['chat_id']
-        
-        # Modify this part to include the agent name in the response
         reply = assistant_response.get('reply', [])
         for message in reply:
             if message['role'] == 'assistant':
-                message['name'] = message.get('name', 'Assistant')
-        
-        return assistant_response
+                return message
+
+        return {"role": "assistant", "name": "Planner", "content": "Sorry, I cannot help you with that."}
     except requests.exceptions.RequestException as e:
         st.error(f"Error: {e}")
-        return {"reply": [{"role": "assistant", "name": "System", "content": "Sorry, an error occurred while processing your request."}]}
+        return {"reply": [{"role": "assistant", "name": "Planner", "content": "Sorry, an error occurred while processing your request."}]}
 
 def main():
     if not st.session_state.authenticated:
