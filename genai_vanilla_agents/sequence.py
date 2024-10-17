@@ -15,11 +15,11 @@ class Sequence(Askable):
         
         logger.debug("[Sequence %s] initialized with agents: %s", self.id, [step.id for step in self.steps])
 
-    def ask(self, messages: list[dict]):
+    def ask(self, messages: list[dict], stream = False):
         
         execution_result = None
         for step in self.steps:            
-            agent_result = step.ask(messages)
+            agent_result = step.ask(messages, stream=stream)
             logger.debug("[Sequence %s] asked step '%s' with messages: %s", self.id, step.id, agent_result)
             
             if agent_result == "stop":

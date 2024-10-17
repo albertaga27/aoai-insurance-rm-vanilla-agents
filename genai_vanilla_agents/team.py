@@ -1,6 +1,6 @@
 from typing import Callable
 
-from .conversation import Conversation
+from .conversation import AllMessagesStrategy, Conversation, ConversationReadingStrategy
 
 from .agent import Agent
 from .askable import Askable
@@ -10,7 +10,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Team(Askable):
-    def __init__(self, llm: LLM, description: str, id: str, members: list[Askable], system_prompt: str = "", stop_callback: Callable[[list[dict]], bool] = None, allowed_transitions: dict[Agent, list[Agent]] = None):
+    def __init__(self, llm: LLM, description: str, id: str, 
+                 members: list[Askable], 
+                 system_prompt: str = "", 
+                 stop_callback: Callable[[list[dict]], bool] = None, 
+                 allowed_transitions: dict[Agent, list[Agent]] = None,
+                 reading_strategy: ConversationReadingStrategy = AllMessagesStrategy()):
         super().__init__(id, description)
         self.agents = members
         self.system_prompt = system_prompt
@@ -22,10 +27,11 @@ class Team(Askable):
         self.agents_dict = {agent.id: agent for agent in members}
         
         self.llm = llm
+        self.reading_strategy = reading_strategy
         
         logger.debug("[Team %s] initialized with agents: %s", self.id, self.agents_dict)
 
-    def ask(self, conversation: Conversation):
+    def ask(self, conversation: Conversation, stream = False):
         
         execution_result = None
         while True:
@@ -35,7 +41,7 @@ class Team(Askable):
             self.current_agent = self.agents_dict[next_agent_id]
             logger.debug("[Team %s] current agent: '%s'", self.id, self.current_agent.id)
             
-            agent_result = self.current_agent.ask(conversation)
+            agent_result = self.current_agent.ask(conversation, stream=stream)
             logger.debug("[Team %s] asked current agent with messages: %s", self.id, agent_result)
             
             if agent_result == "stop":
@@ -75,15 +81,22 @@ BE SURE TO READ AGAIN THE INSTUCTIONS ABOVE BEFORE PROCEEDING.
 """
         local_messages = []
         agents_info = "\n".join([f"- agent_id: {agent.id}: {agent.description}\n" for agent in self.agents])
-        history = "\n".join([f"{message['role']}: {message['content']}" for message in conversation.messages[1:]])
+        selected_messages = self.reading_strategy.get_messages(conversation)
+        history = "\n".join([f"{message['role']}: {message['content']}" for message in selected_messages])
         
         local_messages.append({"role": "system", "content": system_prompt.format(agents=agents_info, history=history)})
         local_messages.append({"role": "user", "content": "Read the conversation and provide the agent_id of the next speaker."})
         
         # logger.debug("[Team %s] messages for selecting next agent: %s", self.id, local_messages)
         
-        result = self.llm.ask(messages=local_messages)
+        result, usage = self.llm.ask(messages=local_messages, temperature=0)
         logger.debug("[Team %s] result from Azure OpenAI: %s", self.id, result)
+        
+        if usage is not None:
+            # Update conversation metrics with response usage
+            conversation.metrics.total_tokens += usage["total_tokens"]
+            conversation.metrics.prompt_tokens += usage["prompt_tokens"]
+            conversation.metrics.completion_tokens += usage["completion_tokens"]
         
         key = result.content.split(" ")[-1].strip()
         

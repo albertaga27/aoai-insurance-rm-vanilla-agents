@@ -6,7 +6,7 @@ from .conversation import Conversation
 class Askable(ABC):
     
     @abstractmethod
-    def ask(self, conversation: Conversation) -> str:
+    def ask(self, conversation: Conversation, stream = False) -> str:
         pass
     
     def __init__(self, id: str, description: str):

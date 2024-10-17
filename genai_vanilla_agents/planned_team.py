@@ -23,7 +23,7 @@ class PlannedTeam(Askable):
         
         logger.debug("[PlannedTeam %s] initialized with agents: %s", self.id, self.agents_dict)
 
-    def ask(self, conversation: Conversation):
+    def ask(self, conversation: Conversation, stream = False):
         
         if self.plan is None:
             self.plan = self._create_plan(conversation)
@@ -37,7 +37,7 @@ class PlannedTeam(Askable):
             # TODO check behavior
             conversation.messages.append({"role": "assistant", "name": self.id, "content": step["instructions"]})
             
-            agent_result = self.current_agent.ask(conversation)
+            agent_result = self.current_agent.ask(conversation, stream=stream)
             logger.debug("[PlannedTeam %s] asked current agent with messages: %s", self.id, agent_result)
             
             if agent_result == "stop":
@@ -94,8 +94,14 @@ BE SURE TO READ AGAIN THE INSTUCTIONS ABOVE BEFORE PROCEEDING.
         
         # logger.debug("[Team %s] messages for selecting next agent: %s", self.id, local_messages)
         
-        result = self.llm.ask(messages=local_messages)
+        result, usage = self.llm.ask(messages=local_messages)
         logger.debug("[PlannedTeam %s] result from Azure OpenAI: %s", self.id, result)
+        
+        if usage is not None:
+            # Update conversation metrics with response usage
+            conversation.metrics.total_tokens += usage["total_tokens"]
+            conversation.metrics.prompt_tokens += usage["prompt_tokens"]
+            conversation.metrics.completion_tokens += usage["completion_tokens"]
         
         content: str = result.content
         if "```json" in content:

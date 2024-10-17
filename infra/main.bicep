@@ -1,7 +1,7 @@
 // main.bicep
 
 param functionAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-backend:v1.0.23'
-param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.8'
+param webappAppDockerImage string = 'DOCKER|moneta.azurecr.io/moneta-ins-ai-frontend:v1.0.11'
 
 @description('Name of the Resource Group')
 param resourceGroupName string = resourceGroup().name
@@ -64,6 +64,16 @@ var commonTags = {
   solution: 'moneta-ins-gbb-ai-1.0'    
 }
 
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {  
+  name: 'logAnalyticsWorkspace'  
+  location: location  
+  properties: {  
+    retentionInDays: 30  
+  }  
+  tags: {  
+    solution: 'moneta-ins-gbb-ai-1.0'  
+  }  
+}  
 
 // Create an Application Insights instance
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
@@ -72,6 +82,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   kind: 'web'
   properties: {
     Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
   }
 }
 
@@ -237,6 +248,10 @@ resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
         {
           name: 'WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT'
           value: '1'
+        }
+        {
+          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+          value: appInsights.properties.InstrumentationKey
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_URL'

@@ -12,3 +12,5 @@ azure-functions
 requests_html
 pydantic
 python-dotenv
+grpcio-tools
+starlette_gzip_request

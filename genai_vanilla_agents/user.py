@@ -10,7 +10,7 @@ class User:
         self.description = description
         self.interaction_function = interaction_function or input
         
-    def ask(self, conversation: Conversation):
+    def ask(self, conversation: Conversation, stream = False):
         if (self.mode == "interactive"):        
             # Get user input from command line prompt
             user_input = self.interaction_function(f"{self.id}: ")
